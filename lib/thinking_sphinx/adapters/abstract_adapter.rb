@@ -3,12 +3,12 @@ module ThinkingSphinx
     def initialize(model)
       @model = model
     end
-    
+
     def setup
       # Deliberately blank - subclasses should do something though. Well, if
       # they need to.
     end
-      
+
     def self.detect(model)
       adapter = adapter_for_model model
       case adapter
@@ -16,11 +16,13 @@ module ThinkingSphinx
         ThinkingSphinx::MysqlAdapter.new model
       when :postgresql
         ThinkingSphinx::PostgreSQLAdapter.new model
+      when :oracle_enhanced
+        ThinkingSphinx::OracleEnhancedAdapter.new model
       else
         raise "Invalid Database Adapter: Sphinx only supports MySQL and PostgreSQL, not #{adapter}"
       end
     end
-    
+
     def self.adapter_for_model(model)
       case ThinkingSphinx.database_adapter
       when String
@@ -33,7 +35,7 @@ module ThinkingSphinx
         ThinkingSphinx.database_adapter
       end
     end
-    
+
     def self.standard_adapter_for_model(model)
       case model.connection.class.name
       when "ActiveRecord::ConnectionAdapters::MysqlAdapter",
@@ -43,6 +45,8 @@ module ThinkingSphinx
         :mysql
       when "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter"
         :postgresql
+      when "ActiveRecord::ConnectionAdapters::OracleEnhancedAdapter"
+        :oracle_enhanced
       when "ActiveRecord::ConnectionAdapters::JdbcAdapter"
         case model.connection.config[:adapter]
         when "jdbcmysql"
@@ -56,21 +60,21 @@ module ThinkingSphinx
         model.connection.class.name
       end
     end
-    
+
     def quote_with_table(column)
       "#{@model.quoted_table_name}.#{@model.connection.quote_column_name(column)}"
     end
-    
+
     def bigint_pattern
       /bigint/i
     end
-    
+
     def downcase(clause)
       "LOWER(#{clause})"
     end
-    
+
     protected
-    
+
     def connection
       @connection ||= @model.connection
     end
