@@ -2,6 +2,8 @@ module ThinkingSphinx
   class OracleEnhancedAdapter < AbstractAdapter
     def setup
       create_crc32_function
+      create_varchar2_ntt_type
+      create_tostring_function
     end
 
     def sphinx_identifier
@@ -13,7 +15,7 @@ module ThinkingSphinx
     end
 
     def group_concatenate(clause, separator = ' ')
-      "TRIM(RTRIM(REPLACE(REPLACE(XMLAgg(XMLElement(\"x\", #{clause} )), '<x>', ' '), '</x>', '#{separator}'), '#{separator}'))"
+      "to_string(CAST(collect(to_char(#{clause})) AS varchar2_ntt), '#{separator}')"
     end
 
     def cast_to_string(clause)
@@ -86,6 +88,33 @@ i := i + 1;
 END LOOP;
 RETURN tmp - 2 * to_number(bitand(tmp, 4294967295)) + 4294967295;
 END crc32;
+SQL
+    end
+
+    def create_varchar2_ntt_type
+      connection.execute <<-SQL
+CREATE OR REPLACE TYPE varchar2_ntt AS TABLE OF VARCHAR(4000);
+SQL
+    end
+
+    def create_tostring_function
+      connection.execute <<-SQL
+CREATE OR REPLACE FUNCTION to_string (
+                nt_in        IN varchar2_ntt,
+                delimiter_in IN VARCHAR2 DEFAULT ','
+                ) RETURN VARCHAR2 IS
+   v_idx PLS_INTEGER;
+   v_str VARCHAR2(32767);
+   v_dlm VARCHAR2(10);
+BEGIN
+   v_idx := nt_in.FIRST;
+   WHILE v_idx IS NOT NULL LOOP
+      v_str := v_str || v_dlm || nt_in(v_idx);
+      v_dlm := delimiter_in;
+      v_idx := nt_in.NEXT(v_idx);
+   END LOOP;
+   RETURN v_str;
+END to_string;
 SQL
     end
   end
